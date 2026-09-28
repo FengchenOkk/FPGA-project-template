@@ -1,0 +1,20 @@
+{
+    "files.associations": {
+        "*.v": "verilog",
+        "*.vh": "verilog",
+        "*.sv": "systemverilog",
+        "*.svh": "systemverilog"
+    },
+
+    "[verilog]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "editor.defaultFormatter": "chipsalliance.verible"
+    },
+
+    "[systemverilog]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "editor.defaultFormatter": "chipsalliance.verible"
+    }
+}
