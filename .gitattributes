@@ -1,0 +1,37 @@
+# Normalize text files in repository
+* text=auto
+
+# HDL
+*.v      text eol=lf
+*.vh     text eol=lf
+*.sv     text eol=lf
+*.svh    text eol=lf
+*.vhd    text eol=lf
+*.vhdl   text eol=lf
+
+# FPGA constraints / scripts
+*.xdc    text eol=lf
+*.sdc    text eol=lf
+*.qsf    text eol=lf
+*.tcl    text eol=lf
+
+# Scripts
+*.py     text eol=lf
+*.sh     text eol=lf
+*.ps1    text eol=lf
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+
+# Project / documentation
+*.md     text eol=lf
+*.txt    text eol=lf
+*.json   text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+
+# Binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
