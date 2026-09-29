@@ -5,7 +5,7 @@
 #
 #   1. 先打开波形数据库：
 #
-#      vsim -view build/modelsim/simulation.wlf
+#      vsim -l build/modelsim/wave_transcript -view build/modelsim/simulation.wlf
 #
 #   2. 在 ModelSim Transcript 中执行：
 #
@@ -62,7 +62,7 @@ if {[catch {
     puts ""
     puts "请确认已经执行："
     puts ""
-    puts "  vsim -view build/modelsim/simulation.wlf"
+    puts "  vsim -l build/modelsim/wave_transcript -view build/modelsim/simulation.wlf"
     puts ""
     puts "详细错误："
     puts "  $err"

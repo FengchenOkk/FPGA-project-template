@@ -13,7 +13,15 @@
 #
 #   然后执行：
 #
-#   vsim -c -do sim/modelsim/run.do
+#   vsim -c -l build/modelsim/transcript -do sim/modelsim/run.do
+#
+# 如需显式指定仿真顶层，可在执行前设置环境变量：
+#
+#   $env:TOP_MODULE = "my_tb"
+#
+# 未显式指定时，脚本使用 filelist.f 中最后一个 .v/.sv 文件的
+# 文件名（不含扩展名）作为仿真顶层。因此建议将 Testbench 放在
+# filelist.f 的最后，并让文件名与顶层 module 名称一致。
 #
 #
 # 本脚本完成以下工作：
@@ -122,29 +130,29 @@ set FILELIST [file join $PROJECT_ROOT sim filelist.f]
 
 
 # ============================================================
-# 3. 设置读取项目仿真配置
+# 3. 初始化通用仿真顶层选择
 # ============================================================
 
-# 项目相关参数统一存放在：
+# 顶层模块按以下优先级确定：
 #
-#   sim/config.tcl
+#   1. 执行 run.do 前已设置的 Tcl 变量 TOP_MODULE
+#   2. 环境变量 TOP_MODULE
+#   3. filelist.f 中最后一个 .v/.sv 文件的文件名
 #
-# run.do 本身保持通用，
-# 不绑定某一个具体 Testbench。
+# 第 3 种方式要求 Testbench 文件名与其顶层 module 名称一致。
 
-set CONFIG_FILE [file join $PROJECT_ROOT sim config.tcl]
-
-if {![file exists $CONFIG_FILE]} {
-
-    puts ""
-    puts "错误：找不到仿真配置文件："
-    puts "  $CONFIG_FILE"
-    puts ""
-
-    quit -code 1 -f
+if {[info exists TOP_MODULE]} {
+    set TOP_MODULE [string trim $TOP_MODULE]
+} else {
+    set TOP_MODULE ""
 }
 
-source $CONFIG_FILE
+if {$TOP_MODULE eq "" && [info exists ::env(TOP_MODULE)]} {
+    set TOP_MODULE [string trim $::env(TOP_MODULE)]
+}
+
+# 读取 filelist.f 时持续更新；最后保留最后一个 .v/.sv 文件名。
+set AUTO_TOP_MODULE ""
 
 
 
@@ -195,7 +203,7 @@ if {![file exists $FILELIST]} {
     puts ""
     puts "然后执行："
     puts ""
-    puts "  vsim -c -do sim/modelsim/run.do"
+    puts "  vsim -c -l build/modelsim/transcript -do sim/modelsim/run.do"
     puts "============================================================"
     puts ""
 
@@ -270,11 +278,6 @@ puts ""
 
 puts "源文件列表："
 puts "  $FILELIST"
-
-puts ""
-
-puts "仿真顶层模块："
-puts "  $TOP_MODULE"
 
 puts "============================================================"
 puts ""
@@ -553,6 +556,14 @@ while {[gets $fp line] >= 0} {
     set EXT [string tolower [file extension $SOURCE_FILE]]
 
 
+    # 未显式指定 TOP_MODULE 时，默认使用 filelist.f 中最后一个
+    # .v/.sv 文件的文件名作为仿真顶层。
+
+    if {$EXT eq ".v" || $EXT eq ".sv"} {
+        set AUTO_TOP_MODULE [file rootname [file tail $SOURCE_FILE]]
+    }
+
+
 
 # ========================================================
 # 16. 根据 HDL 文件类型选择编译方式
@@ -668,7 +679,34 @@ close $fp
 
 
 # ============================================================
-# 18. HDL 编译完成
+# 18. 确定仿真顶层模块
+# ============================================================
+
+if {$TOP_MODULE eq ""} {
+    set TOP_MODULE $AUTO_TOP_MODULE
+}
+
+if {$TOP_MODULE eq ""} {
+    puts ""
+    puts "============================================================"
+    puts "错误：无法确定仿真顶层模块。"
+    puts ""
+    puts "请确认 sim/filelist.f 至少包含一个 .v 或 .sv 文件，"
+    puts "或者在运行前设置 TOP_MODULE。"
+    puts "============================================================"
+    puts ""
+
+    quit -code 1 -f
+}
+
+puts "仿真顶层模块："
+puts "  $TOP_MODULE"
+puts ""
+
+
+
+# ============================================================
+# 19. HDL 编译完成
 # ============================================================
 
 puts ""
@@ -680,7 +718,7 @@ puts ""
 
 
 # ============================================================
-# 19. 删除旧的 WLF 波形文件
+# 20. 删除旧的 WLF 波形文件
 # ============================================================
 
 # 避免旧的 simulation.wlf 与本次仿真混淆。
@@ -692,7 +730,7 @@ if {[file exists $WLF_FILE]} {
 
 
 # ============================================================
-# 20. 加载 Testbench
+# 21. 加载 Testbench
 # ============================================================
 
 puts "加载仿真顶层："
@@ -728,22 +766,14 @@ vsim \
 
 
 # ============================================================
-# 21. 记录仿真信号
+# 22. 记录仿真信号
 # ============================================================
 
 # ModelSim 中当前 Testbench 的层级通常为：
 #
-#   /example_tb
+#   /<TOP_MODULE>
 #
-# 如果：
-#
-#   TOP_MODULE = example_tb
-#
-# 那么这里构造：
-#
-#   /example_tb
-#
-# 作为波形记录的顶层路径。
+# 这里根据实际选择的 TOP_MODULE 构造波形记录顶层路径。
 
 set TOP_SCOPE "/$TOP_MODULE"
 
@@ -761,25 +791,7 @@ puts ""
 # -r：
 #   recursive，递归记录所有子模块中的信号。
 #
-# 因此：
-#
-#   log -r /example_tb/*
-#
-# 会记录：
-#
-#   example_tb
-#       ├── clk
-#       ├── rst_n
-#       ├── data_in
-#       ├── data_out
-#       └── dut
-#            └── ...
-#
-# 相比：
-#
-#   log -r /*
-#
-# 明确指定 Testbench 层级更加可靠，
+# 明确指定 Testbench 层级比使用根层级通配符更加可靠，
 # 特别是对于较老版本的 ModelSim。
 
 log -r "$TOP_SCOPE/*"
@@ -787,7 +799,7 @@ log -r "$TOP_SCOPE/*"
 
 
 # ============================================================
-# 22. 开始运行仿真
+# 23. 开始运行仿真
 # ============================================================
 
 puts ""
@@ -812,7 +824,7 @@ run -all
 
 
 # ============================================================
-# 23. 仿真完成
+# 24. 仿真完成
 # ============================================================
 
 puts ""
@@ -830,7 +842,7 @@ puts ""
 
 
 # ============================================================
-# 24. 退出 ModelSim
+# 25. 退出 ModelSim
 # ============================================================
 
 quit -f
